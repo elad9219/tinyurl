@@ -12,8 +12,3 @@ services:
         - 27017:27017
       privileged: true
 
-  cassandra:
-    image: cassandra:latest
-    ports:
-      - 9042:9042
-    privileged: true
