@@ -1,23 +1,19 @@
 package com.handson.tinyurl.config;
 
-import com.datastax.oss.driver.api.core.CqlSession;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
+import com.datastax.oss.driver.api.core.CqlSession;
 import java.net.InetSocketAddress;
-import java.net.URISyntaxException;
 
 @Configuration
 public class CassandraConfig {
 
-    @Bean("cassandraSession")
-    public CqlSession getCassandraSession() throws URISyntaxException {
+    @Bean
+    public CqlSession getCassandraSession() {
         return CqlSession.builder()
-                .addContactPoint(new InetSocketAddress("localhost", 9042))
-                .withKeyspace("tiny_keyspace")
+                .addContactPoint(new InetSocketAddress("node128.codingbc.com", 9042))
                 .withLocalDatacenter("datacenter1")
+                .withKeyspace("tiny_keyspace")
                 .build();
     }
-
 }
-
