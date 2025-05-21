@@ -19,6 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
+import java.lang.reflect.Field;
+import java.net.URL;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
@@ -56,6 +58,38 @@ public class AppController {
     @Autowired
     private UserClickRepository userClickRepository;
 
+    // Normalize URL to ensure it starts with https:// and includes www. if needed
+    private String normalizeUrl(String longUrl) {
+        try {
+            // If URL doesn't start with http:// or https://, add https://
+            if (!longUrl.startsWith("http://") && !longUrl.startsWith("https://")) {
+                longUrl = "https://" + longUrl;
+            }
+
+            // Parse the URL
+            URL url = new URL(longUrl);
+            String host = url.getHost();
+            String path = url.getPath().isEmpty() ? "/" : url.getPath();
+
+            // If host doesn't start with www., try adding it
+            if (!host.startsWith("www.")) {
+                String withWww = "https://www." + host + path;
+                try {
+                    new URL(withWww).toURI(); // Validate the URL
+                    return withWww;
+                } catch (Exception e) {
+                    // If www. doesn't work, return the original normalized URL
+                    return longUrl;
+                }
+            }
+
+            return longUrl;
+        } catch (Exception e) {
+            // If parsing fails, return the original URL with https://
+            return "https://" + longUrl;
+        }
+    }
+
     // Create a new user using a query parameter for the name
     @RequestMapping(value = "/user", method = RequestMethod.POST)
     public ResponseEntity<String> createUser(@RequestParam String name) {
@@ -85,9 +119,24 @@ public class AppController {
 
     @RequestMapping(value = "/tiny", method = RequestMethod.POST)
     public String generate(@RequestBody NewTinyRequest request) throws JsonProcessingException {
+        String longUrl = normalizeUrl(request.getLongUrl());
+        // Create a new NewTinyRequest with the normalized URL using reflection
+        NewTinyRequest normalizedRequest = new NewTinyRequest();
+        try {
+            Field longUrlField = NewTinyRequest.class.getDeclaredField("longUrl");
+            longUrlField.setAccessible(true);
+            longUrlField.set(normalizedRequest, longUrl);
+
+            Field userNameField = NewTinyRequest.class.getDeclaredField("userName");
+            userNameField.setAccessible(true);
+            userNameField.set(normalizedRequest, request.getUserName());
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to set fields in NewTinyRequest", e);
+        }
+
         String tinyCode = generateTinyCode();
         int i = 0;
-        while (!redis.set(tinyCode, om.writeValueAsString(request)) && i < MAX_RETRIES) {
+        while (!redis.set(tinyCode, om.writeValueAsString(normalizedRequest)) && i < MAX_RETRIES) {
             tinyCode = generateTinyCode();
             i++;
         }
