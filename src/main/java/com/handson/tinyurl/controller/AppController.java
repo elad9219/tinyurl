@@ -2,6 +2,7 @@ package com.handson.tinyurl.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.handson.tinyurl.model.ApiResponse;
 import com.handson.tinyurl.model.NewTinyRequest;
 import com.handson.tinyurl.model.User;
 import com.handson.tinyurl.model.UserClickOut;
@@ -22,6 +23,7 @@ import org.springframework.web.servlet.ModelAndView;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -106,9 +108,18 @@ public class AppController {
 
     // Get user details by name
     @RequestMapping(value = "/user/{name}", method = RequestMethod.GET)
-    public User getUser(@PathVariable String name) {
+    public ResponseEntity<User> getUser(@PathVariable String name) {
         User user = userRepository.findFirstByName(name);
-        return user;
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        // Create a copy of the user with non-null shorts
+        User responseUser = anUser()
+                .withName(user.getName())
+                .withAllUrlClicks(user.getAllUrlClicks())
+                .withShorts(user.getShorts() != null ? user.getShorts() : new HashMap<>())
+                .build();
+        return ResponseEntity.ok(responseUser);
     }
 
     private void incrementMongoField(String userName, String key) {
@@ -163,11 +174,14 @@ public class AppController {
     }
 
     @RequestMapping(value = "/user/{name}/clicks", method = RequestMethod.GET)
-    public List<UserClickOut> getUserClicks(@PathVariable String name) {
-        var userClicks = createStreamFromIterator(userClickRepository.findByUserName(name).iterator())
+    public ResponseEntity<ApiResponse<UserClickOut>> getUserClicks(@PathVariable String name) {
+        List<UserClickOut> userClicks = createStreamFromIterator(userClickRepository.findByUserName(name).iterator())
                 .map(userClick -> UserClickOut.of(userClick))
                 .collect(Collectors.toList());
-        return userClicks;
+        if (userClicks.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.empty("No clicks found"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(userClicks));
     }
 
     private String generateTinyCode() {
