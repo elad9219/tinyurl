@@ -9,6 +9,8 @@ import com.handson.tinyurl.model.UserClickOut;
 import com.handson.tinyurl.repository.UserClickRepository;
 import com.handson.tinyurl.repository.UserRepository;
 import com.handson.tinyurl.service.Redis;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -37,6 +39,8 @@ import static org.springframework.data.util.StreamUtils.createStreamFromIterator
 @RestController
 public class AppController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AppController.class);
+
     private static final int MAX_RETRIES = 4;
     private static final int TINY_LENGTH = 6;
 
@@ -62,6 +66,7 @@ public class AppController {
 
     // Normalize URL to ensure it starts with https:// and includes www. if needed
     private String normalizeUrl(String longUrl) {
+        logger.debug("Normalizing URL: {}", longUrl);
         try {
             // If URL doesn't start with http:// or https://, add https://
             if (!longUrl.startsWith("http://") && !longUrl.startsWith("https://")) {
@@ -78,16 +83,20 @@ public class AppController {
                 String withWww = "https://www." + host + path;
                 try {
                     new URL(withWww).toURI(); // Validate the URL
+                    logger.debug("Normalized URL with www: {}", withWww);
                     return withWww;
                 } catch (Exception e) {
                     // If www. doesn't work, return the original normalized URL
+                    logger.debug("Failed to add www, returning original: {}", longUrl);
                     return longUrl;
                 }
             }
 
+            logger.debug("URL already normalized: {}", longUrl);
             return longUrl;
         } catch (Exception e) {
             // If parsing fails, return the original URL with https://
+            logger.warn("Failed to parse URL, adding https://: {}", longUrl);
             return "https://" + longUrl;
         }
     }
@@ -95,41 +104,66 @@ public class AppController {
     // Create a new user using a query parameter for the name
     @RequestMapping(value = "/user", method = RequestMethod.POST)
     public ResponseEntity<String> createUser(@RequestParam String name) {
-        // Check if a user with the same name already exists
-        User existingUser = userRepository.findFirstByName(name);
-        if (existingUser != null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("User already exists");
+        logger.info("Attempting to create user: {}", name);
+        try {
+            // Check if a user with the same name already exists
+            User existingUser = userRepository.findFirstByName(name);
+            logger.debug("Existing user found: {}", existingUser != null ? existingUser.getName() : "null");
+            if (existingUser != null) {
+                logger.warn("User already exists: {}", name);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("User already exists");
+            }
+            // Create and insert the new user
+            User user = anUser().withName(name).build();
+            userRepository.insert(user);
+            logger.info("User created successfully: {}", name);
+            return ResponseEntity.ok("User created successfully");
+        } catch (Exception e) {
+            logger.error("Error creating user: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error creating user: " + e.getMessage());
         }
-        // Create and insert the new user
-        User user = anUser().withName(name).build();
-        userRepository.insert(user);
-        return ResponseEntity.ok("User created successfully");
     }
 
     // Get user details by name
     @RequestMapping(value = "/user/{name}", method = RequestMethod.GET)
     public ResponseEntity<User> getUser(@PathVariable String name) {
-        User user = userRepository.findFirstByName(name);
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        logger.info("Fetching user: {}", name);
+        try {
+            User user = userRepository.findFirstByName(name);
+            logger.debug("User found: {}", user != null ? user.getName() : "null");
+            if (user == null) {
+                logger.warn("User not found: {}", name);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+            // Create a copy of the user with non-null shorts
+            User responseUser = anUser()
+                    .withName(user.getName())
+                    .withAllUrlClicks(user.getAllUrlClicks())
+                    .withShorts(user.getShorts() != null ? user.getShorts() : new HashMap<>())
+                    .build();
+            logger.info("User fetched successfully: {}", name);
+            return ResponseEntity.ok(responseUser);
+        } catch (Exception e) {
+            logger.error("Error fetching user: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
-        // Create a copy of the user with non-null shorts
-        User responseUser = anUser()
-                .withName(user.getName())
-                .withAllUrlClicks(user.getAllUrlClicks())
-                .withShorts(user.getShorts() != null ? user.getShorts() : new HashMap<>())
-                .build();
-        return ResponseEntity.ok(responseUser);
     }
 
     private void incrementMongoField(String userName, String key) {
-        Query query = Query.query(Criteria.where("name").is(userName));
-        Update update = new Update().inc(key, 1);
-        mongoTemplate.updateFirst(query, update, "users");
+        logger.debug("Incrementing Mongo field: userName={}, key={}", userName, key);
+        try {
+            Query query = Query.query(Criteria.where("name").is(userName));
+            Update update = new Update().inc(key, 1);
+            mongoTemplate.updateFirst(query, update, "users");
+            logger.debug("Field incremented successfully: userName={}, key={}", userName, key);
+        } catch (Exception e) {
+            logger.error("Error incrementing Mongo field: userName={}, key={}, error={}", userName, key, e.getMessage(), e);
+        }
     }
 
     @RequestMapping(value = "/tiny", method = RequestMethod.POST)
     public String generate(@RequestBody NewTinyRequest request) throws JsonProcessingException {
+        logger.info("Generating tiny URL for: longUrl={}, userName={}", request.getLongUrl(), request.getUserName());
         String longUrl = normalizeUrl(request.getLongUrl());
         // Create a new NewTinyRequest with the normalized URL using reflection
         NewTinyRequest normalizedRequest = new NewTinyRequest();
@@ -142,6 +176,7 @@ public class AppController {
             userNameField.setAccessible(true);
             userNameField.set(normalizedRequest, request.getUserName());
         } catch (NoSuchFieldException | IllegalAccessException e) {
+            logger.error("Failed to set fields in NewTinyRequest: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to set fields in NewTinyRequest", e);
         }
 
@@ -151,13 +186,23 @@ public class AppController {
             tinyCode = generateTinyCode();
             i++;
         }
-        if (i == MAX_RETRIES) throw new RuntimeException("SPACE IS FULL");
-        return baseUrl + tinyCode + "/";
+        if (i == MAX_RETRIES) {
+            logger.error("Failed to generate tiny code after {} retries", MAX_RETRIES);
+            throw new RuntimeException("SPACE IS FULL");
+        }
+        String tinyUrl = baseUrl + tinyCode + "/";
+        logger.info("Tiny URL generated: {}", tinyUrl);
+        return tinyUrl;
     }
 
     @RequestMapping(value = "/{tiny}/", method = RequestMethod.GET)
     public ModelAndView getTiny(@PathVariable String tiny) throws JsonProcessingException {
+        logger.info("Fetching tiny URL: {}", tiny);
         Object tinyRequestStr = redis.get(tiny);
+        if (tinyRequestStr == null) {
+            logger.warn("Tiny URL not found: {}", tiny);
+            throw new RuntimeException(tiny + " not found");
+        }
         NewTinyRequest tinyRequest = om.readValue(tinyRequestStr.toString(), NewTinyRequest.class);
         if (tinyRequest.getLongUrl() != null) {
             String userName = tinyRequest.getUserName();
@@ -166,22 +211,33 @@ public class AppController {
                 incrementMongoField(userName, "shorts." + tiny + ".clicks." + getCurMonth());
                 userClickRepository.save(anUserClick().userClickKey(anUserClickKey().withUserName(userName).withClickTime(new Date()).build())
                         .tiny(tiny).longUrl(tinyRequest.getLongUrl()).build());
+                logger.debug("Click recorded for user: {}, tiny: {}", userName, tiny);
             }
+            logger.info("Redirecting to: {}", tinyRequest.getLongUrl());
             return new ModelAndView("redirect:" + tinyRequest.getLongUrl());
         } else {
+            logger.warn("Invalid tiny URL: {}", tiny);
             throw new RuntimeException(tiny + " not found");
         }
     }
 
     @RequestMapping(value = "/user/{name}/clicks", method = RequestMethod.GET)
     public ResponseEntity<ApiResponse<UserClickOut>> getUserClicks(@PathVariable String name) {
-        List<UserClickOut> userClicks = createStreamFromIterator(userClickRepository.findByUserName(name).iterator())
-                .map(userClick -> UserClickOut.of(userClick))
-                .collect(Collectors.toList());
-        if (userClicks.isEmpty()) {
-            return ResponseEntity.ok(ApiResponse.empty("No clicks found"));
+        logger.info("Fetching clicks for user: {}", name);
+        try {
+            List<UserClickOut> userClicks = createStreamFromIterator(userClickRepository.findByUserName(name).iterator())
+                    .map(userClick -> UserClickOut.of(userClick))
+                    .collect(Collectors.toList());
+            logger.debug("Found {} clicks for user: {}", userClicks.size(), name);
+            if (userClicks.isEmpty()) {
+                logger.info("No clicks found for user: {}", name);
+                return ResponseEntity.ok(ApiResponse.empty("No clicks found"));
+            }
+            return ResponseEntity.ok(ApiResponse.success(userClicks));
+        } catch (Exception e) {
+            logger.error("Error fetching clicks for user: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.empty("Error fetching clicks"));
         }
-        return ResponseEntity.ok(ApiResponse.success(userClicks));
     }
 
     private String generateTinyCode() {
@@ -190,6 +246,7 @@ public class AppController {
         for (int i = 0; i < TINY_LENGTH; i++) {
             res.append(charPool.charAt(random.nextInt(charPool.length())));
         }
+        logger.debug("Generated tiny code: {}", res);
         return res.toString();
     }
 }
