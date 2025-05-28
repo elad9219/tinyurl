@@ -213,7 +213,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Author**: Elad Tennenboim
 - **GitHub**: [elad9219](https://github.com/elad9219)
 - **Email**: elad9219@gmail.com
-- **LinkedIn**: [Add your LinkedIn profile (optional)](https://www.linkedin.com/in/elad-tennenboim/)
+- **LinkedIn**: https://www.linkedin.com/in/elad-tennenboim/
 
 ---
 
