@@ -145,15 +145,25 @@ Click Details: 27/05/2025 17:34:56 - https://www.ynet.co.il/ (OXeqgq)
 ## Screenshots
 Add screenshots to showcase the app's interface. Place images in a `screenshots/` folder and update the links below:
 
-- **Homepage**: ![image](https://github.com/user-attachments/assets/c916cdad-9119-4bf8-a83a-d61f7d8281b1)
+- **Homepage**:
 
-- **Create User**: ![image](https://github.com/user-attachments/assets/67949b52-39d6-48d0-b4da-74335b70bd20)
+   ![image](https://github.com/user-attachments/assets/c916cdad-9119-4bf8-a83a-d61f7d8281b1)
 
-- **Create Tiny URL**: ![image](https://github.com/user-attachments/assets/2a9b3d41-79b9-4d93-a670-6cd3681eceb3)
+- **Create User**:
 
-- **User Information**: ![image](https://github.com/user-attachments/assets/d56d8e5e-863f-42fd-89b4-38e5f152a494)
+  ![image](https://github.com/user-attachments/assets/67949b52-39d6-48d0-b4da-74335b70bd20)
 
-- **Click Details**: ![image](https://github.com/user-attachments/assets/808bbdae-e858-4eeb-b320-75d86866bfd8)
+- **Create Tiny URL**:
+
+   ![image](https://github.com/user-attachments/assets/2a9b3d41-79b9-4d93-a670-6cd3681eceb3)
+
+- **User Information**:
+
+   ![image](https://github.com/user-attachments/assets/d56d8e5e-863f-42fd-89b4-38e5f152a494)
+
+- **Click Details**:
+
+    ![image](https://github.com/user-attachments/assets/808bbdae-e858-4eeb-b320-75d86866bfd8)
 
 
 **Instructions**:
