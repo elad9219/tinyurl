@@ -145,11 +145,16 @@ Click Details: 27/05/2025 17:34:56 - https://www.ynet.co.il/ (OXeqgq)
 ## Screenshots
 Add screenshots to showcase the app's interface. Place images in a `screenshots/` folder and update the links below:
 
-- **Homepage**: ![Homepage](screenshots/homepage.png)
-- **Create User**: ![Create User](screenshots/create-user.png)
-- **Create Tiny URL**: ![Create Tiny URL](screenshots/create-tiny-url.png)
-- **User Information**: ![User Info](screenshots/user-info.png)
-- **Click Details**: ![Click Details](screenshots/click-details.png)
+- **Homepage**: ![image](https://github.com/user-attachments/assets/c916cdad-9119-4bf8-a83a-d61f7d8281b1)
+
+- **Create User**: ![image](https://github.com/user-attachments/assets/67949b52-39d6-48d0-b4da-74335b70bd20)
+
+- **Create Tiny URL**: ![image](https://github.com/user-attachments/assets/2a9b3d41-79b9-4d93-a670-6cd3681eceb3)
+
+- **User Information**: ![image](https://github.com/user-attachments/assets/d56d8e5e-863f-42fd-89b4-38e5f152a494)
+
+- **Click Details**: ![image](https://github.com/user-attachments/assets/808bbdae-e858-4eeb-b320-75d86866bfd8)
+
 
 **Instructions**:
 1. Take screenshots of the app (e.g., homepage, create user form, tiny URL result, user info, click details).
