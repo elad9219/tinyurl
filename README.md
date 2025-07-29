@@ -143,7 +143,6 @@ Click Details: 27/05/2025 17:34:56 - https://www.ynet.co.il/ (OXeqgq)
 ```
 
 ## Screenshots
-Add screenshots to showcase the app's interface. Place images in a `screenshots/` folder and update the links below:
 
 - **Homepage**:
 
@@ -166,19 +165,6 @@ Add screenshots to showcase the app's interface. Place images in a `screenshots/
     ![image](https://github.com/user-attachments/assets/808bbdae-e858-4eeb-b320-75d86866bfd8)
 
 
-**Instructions**:
-1. Take screenshots of the app (e.g., homepage, create user form, tiny URL result, user info, click details).
-2. Create a `screenshots/` folder in the repository:
-   ```bash
-   mkdir screenshots
-   ```
-3. Save images as `homepage.png`, `create-user.png`, etc.
-4. Commit and push:
-   ```bash
-   git add screenshots/
-   git commit -m "Add screenshots for README"
-   git push origin main
-   ```
 
 ## Project Structure
 ### Backend (`elad9219/tinyurl`)
