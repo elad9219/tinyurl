@@ -10,8 +10,8 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("https://shorturl.runmydocker-app.com",
-                        "http://localhost:3000","https://surl.runmydocker-app.com")
+                // Using allowedOriginPatterns instead of allowedOrigins to support ANY dynamic Vercel domain securely
+                .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
