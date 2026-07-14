@@ -13,7 +13,7 @@ spring.redis.pool.min-idle=0
 #spring.redis.port=6379
 
 #mongoDB
-spring.data.mongodb.uri=mongodb://<USER>:<PASSWORD>@<HOST>:<PORT>/<DATABASE>?retryWrites=true&w=majority&connectTimeout=10000
+spring.data.mongodb.uri=mongodb+srv://<USER>:<PASSWORD>@<HOST>/tinydb?retryWrites=true&w=majority
 #local
 #spring.data.mongodb.uri=mongodb://localhost:27017/tinydb
 
