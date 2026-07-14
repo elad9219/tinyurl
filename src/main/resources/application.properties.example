@@ -19,9 +19,10 @@ spring.data.mongodb.uri=mongodb+srv://<USER>:<PASSWORD>@<HOST>/tinydb?retryWrite
 
 #Cassandra
 spring.data.cassandra.keyspace-name=tiny_keyspace
-spring.data.cassandra.contact-points=<CASSANDRA_HOST>
-spring.data.cassandra.port=9042
+spring.data.cassandra.username=<CLIENT_ID>
+spring.data.cassandra.password=<CLIENT_SECRET>
 spring.data.cassandra.schema-action=create_if_not_exists
+astra.db.secure-connect-bundle=secure-connect-tinyurl-db.zip
 #local
 #spring.data.cassandra.contact-points=cassandra
 
