@@ -1,3 +1,4 @@
+
 package com.handson.tinyurl.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,6 +11,7 @@ import com.handson.tinyurl.repository.UserClickRepository;
 import com.handson.tinyurl.repository.UserRepository;
 import com.handson.tinyurl.service.Redis;
 import com.handson.tinyurl.util.UrlNormalizer;
+import com.mongodb.client.result.UpdateResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +29,7 @@ import org.springframework.web.servlet.ModelAndView;
 import javax.annotation.PostConstruct;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -75,7 +78,7 @@ public class AppController {
         logger.info("Loaded baseUrl: {}", baseUrl);
     }
 
-    @RequestMapping(value = "/user", method = RequestMethod.POST)
+    @PostMapping("/user")
     public ResponseEntity<String> createUser(@RequestParam String name) {
 
         if (name == null || name.trim().isEmpty()) {
@@ -110,7 +113,7 @@ public class AppController {
         }
     }
 
-    @RequestMapping(value = "/user/{name}", method = RequestMethod.GET)
+    @GetMapping("/user/{name}")
     public ResponseEntity<User> getUser(@PathVariable String name) {
 
         try {
@@ -162,41 +165,35 @@ public class AppController {
         }
     }
 
-    private void updateUserShorts(
-            String userName,
-            String tinyCode,
-            String longUrl
-    ) {
-
+    private void removeReservedCode(String tinyCode) {
         try {
-            Query query = new Query(
-                    Criteria.where("name").is(userName)
-            );
-
-            Update update = new Update().set(
-                    "shorts." + tinyCode + ".longUrl",
-                    longUrl
-            );
-
-            mongoTemplate.updateFirst(query, update, "users");
-
+            redis.del(tinyCode);
         } catch (Exception e) {
             logger.error(
-                    "Failed to update shortened URLs for user {}",
-                    userName,
+                    "Failed to remove reserved short code {}",
+                    tinyCode,
                     e
             );
         }
     }
 
-    @RequestMapping(value = "/tiny", method = RequestMethod.POST)
+    @PostMapping("/tiny")
     public ResponseEntity<String> generate(
             @RequestBody NewTinyRequest request
     ) throws JsonProcessingException {
 
         if (request == null) {
             return ResponseEntity.badRequest()
-                    .body("Please provide a URL");
+                    .body("Please provide a URL and username");
+        }
+
+        String userName = request.getUserName() == null
+                ? ""
+                : request.getUserName().trim();
+
+        if (userName.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body("Please enter a username");
         }
 
         final String normalizedUrl;
@@ -209,21 +206,22 @@ public class AppController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
 
-        String userName = request.getUserName();
-
-        if (userName != null) {
-            userName = userName.trim();
-
-            if (userName.isEmpty()) {
-                userName = null;
+        try {
+            if (!userRepository.existsByName(userName)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("User not found. Please create the user first.");
             }
+        } catch (Exception e) {
+            logger.error("Unable to verify user {}", userName, e);
+
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Unable to verify the user right now.");
         }
 
         NewTinyRequest normalizedRequest =
                 new NewTinyRequest(normalizedUrl, userName);
 
         String json = mapper.writeValueAsString(normalizedRequest);
-
         String tinyCode = null;
 
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -237,7 +235,7 @@ public class AppController {
 
         if (tinyCode == null) {
             logger.error(
-                    "Unable to allocate a short code after {} attempts",
+                    "Unable to reserve a short code after {} attempts",
                     MAX_RETRIES
             );
 
@@ -248,8 +246,45 @@ public class AppController {
             );
         }
 
-        if (userName != null) {
-            updateUserShorts(userName, tinyCode, normalizedUrl);
+        try {
+            Query query = new Query(
+                    Criteria.where("name").is(userName)
+            );
+
+            Update update = new Update()
+                    .set("shorts." + tinyCode + ".longUrl", normalizedUrl)
+                    .set(
+                            "shorts." + tinyCode + ".clicks",
+                            Collections.emptyMap()
+                    );
+
+            UpdateResult result = mongoTemplate.updateFirst(
+                    query,
+                    update,
+                    "users"
+            );
+
+            if (result.getMatchedCount() == 0) {
+                removeReservedCode(tinyCode);
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("User not found. Please create the user first.");
+            }
+
+        } catch (Exception e) {
+            logger.error(
+                    "Unable to save link metadata for user {}",
+                    userName,
+                    e
+            );
+
+            removeReservedCode(tinyCode);
+
+            return ResponseEntity.status(
+                    HttpStatus.SERVICE_UNAVAILABLE
+            ).body(
+                    "Unable to save the short URL. Please try again."
+            );
         }
 
         String prefix = baseUrl.endsWith("/")
@@ -263,10 +298,7 @@ public class AppController {
         return ResponseEntity.ok(tinyUrl);
     }
 
-    @RequestMapping(
-            value = "/{tiny}/",
-            method = RequestMethod.GET
-    )
+    @GetMapping("/{tiny}/")
     public ModelAndView getTiny(
             @PathVariable String tiny
     ) throws JsonProcessingException {
@@ -330,7 +362,6 @@ public class AppController {
                 );
 
             } catch (Exception e) {
-                // Analytics must never prevent a valid redirect.
                 logger.error(
                         "Unable to save click analytics for short code {}",
                         tiny,
@@ -342,15 +373,14 @@ public class AppController {
         return new ModelAndView("redirect:" + longUrl);
     }
 
-    @RequestMapping(
-            value = "/user/{name}/clicks",
-            method = RequestMethod.GET
-    )
+    @GetMapping("/user/{name}/clicks")
     public ResponseEntity<List<UserClickOut>> getUserClicks(
             @PathVariable String name
     ) {
 
         try {
+            // Keep this endpoint read-only and compatible with
+            // existing Cassandra keepalive probes.
             Iterable<UserClick> iterable =
                     userClickRepository.findByUserName(name);
 
@@ -363,10 +393,6 @@ public class AppController {
             List<UserClickOut> result = userClicks.stream()
                     .map(UserClickOut::of)
                     .collect(Collectors.toList());
-
-            if (result.isEmpty()) {
-                return ResponseEntity.ok(new ArrayList<>());
-            }
 
             return ResponseEntity.ok(result);
 
