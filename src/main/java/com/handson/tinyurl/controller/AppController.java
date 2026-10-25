@@ -26,7 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;

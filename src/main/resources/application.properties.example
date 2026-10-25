@@ -2,7 +2,7 @@ base.url=https://url.runmydocker-app.com/
 #base.url=http://localhost:8080/
 
 #Redis (Upstash Cloud - Secured TLS)
-spring.redis.url=rediss://default:<YOUR_UPSTASH_REDIS_PASSWORD>@<YOUR_UPSTASH_REDIS_ENDPOINT>:6379
+spring.data.redis.url=rediss://default:<YOUR_UPSTASH_REDIS_PASSWORD>@<YOUR_UPSTASH_REDIS_ENDPOINT>:6379
 spring.redis.pool.max-active=8
 spring.redis.pool.max-wait=-1
 spring.redis.pool.max-idle=8
