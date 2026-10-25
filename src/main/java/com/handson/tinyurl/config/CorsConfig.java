@@ -1,3 +1,4 @@
+
 package com.handson.tinyurl.config;
 
 import org.springframework.context.annotation.Configuration;
@@ -10,10 +11,17 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                // Using allowedOriginPatterns instead of allowedOrigins to support ANY dynamic Vercel domain securely
-                .allowedOriginPatterns("*")
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedOrigins(
+                        "http://localhost:3000",
+                        "https://etinyurl.vercel.app"
+                )
+                .allowedMethods(
+                        "GET",
+                        "POST",
+                        "OPTIONS"
+                )
                 .allowedHeaders("*")
-                .allowCredentials(true);
+                .allowCredentials(false)
+                .maxAge(3600);
     }
 }

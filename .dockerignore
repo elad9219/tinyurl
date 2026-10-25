@@ -1,0 +1,33 @@
+
+# Git and editor files
+.git
+.idea
+.vscode
+*.iml
+.DS_Store
+
+# Build artifacts
+target
+build
+out
+node_modules
+
+# Local environment configuration
+.env
+.env.*
+**/.env
+**/.env.*
+**/application.properties
+**/application-*.properties
+
+# Sensitive database connection files
+**/secure-connect*.zip
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+
+# Logs and temporary files
+*.log
+logs
+tmp
