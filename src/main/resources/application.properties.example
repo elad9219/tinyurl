@@ -29,3 +29,7 @@ astra.db.secure-connect-bundle=secure-connect-tinyurl-db.zip
 #health check
 management.endpoints.web.exposure.include=health,info
 management.endpoint.health.show-details=never
+
+# CORS for Spring Boot Actuator health endpoint
+management.endpoints.web.cors.allowed-origins=http://localhost:3000,https://etinyurl.vercel.app
+management.endpoints.web.cors.allowed-methods=GET,OPTIONS

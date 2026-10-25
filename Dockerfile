@@ -1,17 +1,42 @@
-# Stage 1: Build the application
-FROM eclipse-temurin:11-jdk AS build
+# Stage 1: Build the Spring Boot application
+FROM maven:3.9-eclipse-temurin-21 AS build
+
 WORKDIR /app
-COPY pom.xml .
+
+COPY pom.xml ./
 COPY src ./src
 
-# Remove old frontend static files so they are not packaged into the JAR
+# Prevent accidental packaging of local credentials
+RUN ! find src -type f \
+        \( -name 'application.properties' \
+        -o -name 'secure-connect*.zip' \) \
+        | grep -q .
+
+# The React frontend is deployed separately on Vercel
 RUN rm -rf src/main/resources/static
 
-RUN apt-get update && apt-get install -y maven && mvn clean package -DskipTests && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Build the executable JAR
+RUN mvn --batch-mode --no-transfer-progress \
+    clean package -DskipTests
 
-# Stage 2: Run the application
-FROM eclipse-temurin:11-jre
+# Stage 2: Java 21 runtime
+FROM eclipse-temurin:21-jre
+
 WORKDIR /app
-COPY --from=build /app/target/tinyurl-0.0.1-SNAPSHOT.jar .
+
+# Run the application as a non-root user
+RUN groupadd --system appgroup \
+    && useradd --system \
+       --gid appgroup \
+       appuser
+
+COPY --from=build \
+    --chown=appuser:appgroup \
+    /app/target/tinyurl-0.0.1-SNAPSHOT.jar \
+    /app/tinyurl.jar
+
+USER appuser
+
 EXPOSE 8080
-CMD ["java", "-jar", "tinyurl-0.0.1-SNAPSHOT.jar"]
+
+ENTRYPOINT ["java", "-jar", "/app/tinyurl.jar"]
