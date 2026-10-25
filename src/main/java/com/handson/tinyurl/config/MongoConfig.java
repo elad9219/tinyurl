@@ -1,3 +1,4 @@
+
 package com.handson.tinyurl.config;
 
 import com.mongodb.client.MongoClient;
@@ -9,19 +10,16 @@ import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
 @Configuration
 public class MongoConfig extends AbstractMongoClientConfiguration {
 
-    // Inject the MongoDB URI dynamically from application.properties
-    @Value("${spring.data.mongodb.uri}")
+    @Value("${spring.mongodb.uri}")
     private String mongoUri;
 
     @Override
     protected String getDatabaseName() {
-        // Matches the target database name
         return "tinydb";
     }
 
     @Override
     public MongoClient mongoClient() {
-        // Create the MongoClient securely using the injected URI
         return MongoClients.create(mongoUri);
     }
 

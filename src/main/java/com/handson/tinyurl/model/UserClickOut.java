@@ -1,26 +1,14 @@
+
 package com.handson.tinyurl.model;
 
-
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.handson.tinyurl.util.Dates;
-import org.joda.time.LocalDateTime;
-import org.springframework.data.cassandra.core.mapping.PrimaryKey;
-import org.springframework.data.cassandra.core.mapping.Table;
 
 import java.util.Date;
-import java.util.Objects;
 
 public class UserClickOut {
 
     private String userName;
     private Date clickTime;
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonProperty("clickTime")
-    public LocalDateTime calcClickTime() {
-        return Dates.atLocalTime(clickTime);
-    }
-
     private String tiny;
     private String longUrl;
 
@@ -28,6 +16,11 @@ public class UserClickOut {
         return userName;
     }
 
+    @JsonFormat(
+            shape = JsonFormat.Shape.STRING,
+            pattern = "yyyy-MM-dd HH:mm:ss",
+            timezone = "Asia/Jerusalem"
+    )
     public Date getClickTime() {
         return clickTime;
     }
@@ -41,11 +34,17 @@ public class UserClickOut {
     }
 
     public static UserClickOut of(UserClick userClick) {
-        UserClickOut res = new UserClickOut();
-        res.userName = userClick.getUserClickKey().getUserName();
-        res.clickTime = userClick.getUserClickKey().getClickTime();
-        res.tiny = userClick.getTiny();
-        res.longUrl = userClick.getLongUrl();
-        return res;
+        UserClickOut result = new UserClickOut();
+
+        result.userName =
+                userClick.getUserClickKey().getUserName();
+
+        result.clickTime =
+                userClick.getUserClickKey().getClickTime();
+
+        result.tiny = userClick.getTiny();
+        result.longUrl = userClick.getLongUrl();
+
+        return result;
     }
 }

@@ -1,8 +1,9 @@
 
 package com.handson.tinyurl.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import tools.jackson.databind.json.JsonMapper;
+
 import com.handson.tinyurl.model.NewTinyRequest;
 import com.handson.tinyurl.model.User;
 import com.handson.tinyurl.model.UserClick;
@@ -12,6 +13,7 @@ import com.handson.tinyurl.repository.UserRepository;
 import com.handson.tinyurl.service.Redis;
 import com.handson.tinyurl.util.UrlNormalizer;
 import com.mongodb.client.result.UpdateResult;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +28,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
-import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,7 +60,7 @@ public class AppController {
     private Redis redis;
 
     @Autowired
-    private ObjectMapper mapper;
+    private JsonMapper mapper;
 
     @Autowired
     private UserRepository userRepository;
@@ -94,33 +95,53 @@ public class AppController {
                         .body("User already exists");
             }
 
-            User user = anUser().withName(cleanName).build();
+            User user = anUser()
+                    .withName(cleanName)
+                    .build();
+
             userRepository.save(user);
 
-            logger.info("User created successfully: {}", cleanName);
+            logger.info(
+                    "User created successfully: {}",
+                    cleanName
+            );
 
-            return ResponseEntity.ok("User created successfully");
+            return ResponseEntity.ok(
+                    "User created successfully"
+            );
 
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body("User already exists");
 
         } catch (Exception e) {
-            logger.error("Error creating user: {}", cleanName, e);
+            logger.error(
+                    "Error creating user: {}",
+                    cleanName,
+                    e
+            );
 
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Unable to create user. Please try again.");
+            return ResponseEntity.status(
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            ).body(
+                    "Unable to create user. Please try again."
+            );
         }
     }
 
+    // Existing path-based endpoint, preserved for compatibility.
     @GetMapping("/user/{name}")
-    public ResponseEntity<User> getUser(@PathVariable String name) {
+    public ResponseEntity<User> getUser(
+            @PathVariable String name
+    ) {
 
         try {
             User user = userRepository.findFirstByName(name);
 
             if (user == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+                return ResponseEntity.status(
+                        HttpStatus.NOT_FOUND
+                ).build();
             }
 
             User responseUser = anUser()
@@ -136,7 +157,11 @@ public class AppController {
             return ResponseEntity.ok(responseUser);
 
         } catch (Exception e) {
-            logger.error("Error fetching user: {}", name, e);
+            logger.error(
+                    "Error fetching user: {}",
+                    name,
+                    e
+            );
 
             return ResponseEntity.status(
                     HttpStatus.INTERNAL_SERVER_ERROR
@@ -144,7 +169,18 @@ public class AppController {
         }
     }
 
-    private void incrementMongoField(String userName, String field) {
+    // Query-based lookup supports usernames containing '/'.
+    @GetMapping("/user")
+    public ResponseEntity<User> getUserByQuery(
+            @RequestParam String name
+    ) {
+        return getUser(name);
+    }
+
+    private void incrementMongoField(
+            String userName,
+            String field
+    ) {
 
         try {
             Query query = new Query(
@@ -153,7 +189,11 @@ public class AppController {
 
             Update update = new Update().inc(field, 1);
 
-            mongoTemplate.updateFirst(query, update, "users");
+            mongoTemplate.updateFirst(
+                    query,
+                    update,
+                    "users"
+            );
 
         } catch (Exception e) {
             logger.error(
@@ -168,6 +208,7 @@ public class AppController {
     private void removeReservedCode(String tinyCode) {
         try {
             redis.del(tinyCode);
+
         } catch (Exception e) {
             logger.error(
                     "Failed to remove reserved short code {}",
@@ -180,7 +221,7 @@ public class AppController {
     @PostMapping("/tiny")
     public ResponseEntity<String> generate(
             @RequestBody NewTinyRequest request
-    ) throws JsonProcessingException {
+    ) {
 
         if (request == null) {
             return ResponseEntity.badRequest()
@@ -202,29 +243,49 @@ public class AppController {
             normalizedUrl = UrlNormalizer.normalize(
                     request.getLongUrl()
             );
+
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(e.getMessage());
         }
 
         try {
             if (!userRepository.existsByName(userName)) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("User not found. Please create the user first.");
+                return ResponseEntity.status(
+                        HttpStatus.NOT_FOUND
+                ).body(
+                        "User not found. Please create the user first."
+                );
             }
-        } catch (Exception e) {
-            logger.error("Unable to verify user {}", userName, e);
 
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body("Unable to verify the user right now.");
+        } catch (Exception e) {
+            logger.error(
+                    "Unable to verify user {}",
+                    userName,
+                    e
+            );
+
+            return ResponseEntity.status(
+                    HttpStatus.SERVICE_UNAVAILABLE
+            ).body(
+                    "Unable to verify the user right now."
+            );
         }
 
         NewTinyRequest normalizedRequest =
-                new NewTinyRequest(normalizedUrl, userName);
+                new NewTinyRequest(
+                        normalizedUrl,
+                        userName
+                );
 
-        String json = mapper.writeValueAsString(normalizedRequest);
+        String json = mapper.writeValueAsString(
+                normalizedRequest
+        );
+
         String tinyCode = null;
 
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+
             String candidate = generateTinyCode();
 
             if (redis.set(candidate, json)) {
@@ -252,7 +313,10 @@ public class AppController {
             );
 
             Update update = new Update()
-                    .set("shorts." + tinyCode + ".longUrl", normalizedUrl)
+                    .set(
+                            "shorts." + tinyCode + ".longUrl",
+                            normalizedUrl
+                    )
                     .set(
                             "shorts." + tinyCode + ".clicks",
                             Collections.emptyMap()
@@ -267,8 +331,11 @@ public class AppController {
             if (result.getMatchedCount() == 0) {
                 removeReservedCode(tinyCode);
 
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("User not found. Please create the user first.");
+                return ResponseEntity.status(
+                        HttpStatus.NOT_FOUND
+                ).body(
+                        "User not found. Please create the user first."
+                );
             }
 
         } catch (Exception e) {
@@ -293,7 +360,10 @@ public class AppController {
 
         String tinyUrl = prefix + tinyCode + "/";
 
-        logger.info("Tiny URL created: {}", tinyCode);
+        logger.info(
+                "Tiny URL created: {}",
+                tinyCode
+        );
 
         return ResponseEntity.ok(tinyUrl);
     }
@@ -301,7 +371,7 @@ public class AppController {
     @GetMapping("/{tiny}/")
     public ModelAndView getTiny(
             @PathVariable String tiny
-    ) throws JsonProcessingException {
+    ) {
 
         if (tiny == null
                 || tiny.trim().isEmpty()
@@ -370,17 +440,18 @@ public class AppController {
             }
         }
 
-        return new ModelAndView("redirect:" + longUrl);
+        return new ModelAndView(
+                "redirect:" + longUrl
+        );
     }
 
+    // Existing path-based endpoint for GitHub Actions compatibility.
     @GetMapping("/user/{name}/clicks")
     public ResponseEntity<List<UserClickOut>> getUserClicks(
             @PathVariable String name
     ) {
 
         try {
-            // Keep this endpoint read-only and compatible with
-            // existing Cassandra keepalive probes.
             Iterable<UserClick> iterable =
                     userClickRepository.findByUserName(name);
 
@@ -409,14 +480,26 @@ public class AppController {
         }
     }
 
+    // Query-based history lookup supports usernames containing '/'.
+    @GetMapping("/user/clicks")
+    public ResponseEntity<List<UserClickOut>> getUserClicksByQuery(
+            @RequestParam String name
+    ) {
+        return getUserClicks(name);
+    }
+
     private String generateTinyCode() {
 
-        StringBuilder builder = new StringBuilder(TINY_LENGTH);
+        StringBuilder builder = new StringBuilder(
+                TINY_LENGTH
+        );
 
         for (int i = 0; i < TINY_LENGTH; i++) {
             builder.append(
                     CHAR_POOL.charAt(
-                            RANDOM.nextInt(CHAR_POOL.length())
+                            RANDOM.nextInt(
+                                    CHAR_POOL.length()
+                            )
                     )
             );
         }
