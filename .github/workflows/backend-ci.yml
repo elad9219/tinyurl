@@ -1,0 +1,41 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'upgrade/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Java 21 tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify local secrets are not committed
+        run: |
+          test ! -f src/main/resources/application.properties
+          test ! -f src/main/resources/secure-connect-tinyurl-db.zip
+
+      # These are isolated unit tests. TinyurlApplicationTests uses
+      # @SpringBootTest and requires cloud database credentials.
+      - name: Run unit tests and build JAR
+        run: mvn --batch-mode --no-transfer-progress clean verify -Dtest=AppControllerTest,UrlNormalizerTest
