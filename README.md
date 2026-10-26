@@ -1,42 +1,151 @@
-# TinyURL — URL Shortening & Click Analytics Service
+# TinyURL — URL Shortener & Click Analytics API
 
-A full-stack URL shortening application built with Spring Boot and React. The project separates storage responsibilities across Redis, MongoDB, and Cassandra to support fast redirects, user/URL metadata, and click-history analytics.
+A full-stack URL shortening project with a **Java 21 / Spring Boot 4** backend and a **React / TypeScript** frontend. It demonstrates a multi-database architecture, short-link redirects, user management, click analytics, automated tests, and containerized deployment.
 
-## Quick Links
+**Live app:** https://etinyurl.vercel.app/  
+**Backend API:** https://url.runmydocker-app.com/  
+**API documentation:** https://url.runmydocker-app.com/swagger-ui/index.html  
+**Frontend repository:** https://github.com/elad9219/tinyurl-frontend
 
-- **Live Demo:** [etinyurl.vercel.app](https://etinyurl.vercel.app/)
-- **API Documentation (Swagger):** [surl.runmydocker-app.com/swagger-ui.html](https://surl.runmydocker-app.com/swagger-ui.html)
-- **Backend Repository:** [github.com/elad9219/tinyurl](https://github.com/elad9219/tinyurl)
-- **Frontend Repository:** [github.com/elad9219/tinyurl-frontend](https://github.com/elad9219/tinyurl-frontend)
+## What it does
 
-## Highlights
+- **Create users** and reject duplicate usernames.
+- **Shorten URLs** into six-character alphanumeric codes, with URL normalization and collision checks.
+- **Redirect visitors** from a short URL to its original destination.
+- **Track link clicks**, including timestamps and per-user and per-link activity.
+- **View analytics** through the React interface or REST API.
+- **Handle special characters in usernames**, including `/`, with query-based lookup endpoints.
+- **Support a sleeping demo backend** through a frontend readiness check and queued user actions.
 
-- **URL shortening:** Creates compact URLs and redirects visitors to the original destination.
-- **Fast URL resolution:** Uses Redis for short-code-to-URL lookup.
-- **User and URL metadata:** Stores user data and URL metadata in MongoDB.
-- **Click analytics:** Stores click history in Cassandra and exposes per-user and per-URL statistics.
-- **URL normalization:** Normalizes submitted URLs for consistent storage and redirection.
-- **Responsive frontend:** React interface for creating users, shortening URLs, and viewing analytics.
-- **Dockerized backend:** Supports containerized deployment.
+## Architecture
 
-## Storage Design
+```mermaid
+flowchart LR
+    Visitor[Browser / React app] --> API[Spring Boot REST API]
+    API --> Redis[(Redis)]
+    API --> Mongo[(MongoDB)]
+    API --> Cassandra[(Astra DB / Cassandra)]
+    API --> Redirect[HTTP redirect]
+```
 
-| Store | Responsibility |
+| Component | Responsibility |
 | --- | --- |
-| Redis | Fast URL lookup / redirect mapping |
-| MongoDB | User data and short-URL metadata |
-| Cassandra | Click-history and analytics data |
+| **Redis** | Store and resolve short codes for redirects |
+| **MongoDB Atlas** | Store users, link metadata, and aggregated click counters |
+| **DataStax Astra DB / Cassandra** | Store timestamped click-history records |
+| **Spring Boot API** | Validation, URL creation, redirects, analytics, and REST endpoints |
+| **React frontend** | User-facing forms, link creation, and analytics views |
 
-## Technologies
+### Technology stack
 
-- **Backend:** Java 11, Spring Boot, Maven
-- **Frontend:** React, TypeScript, Node.js, npm
-- **Databases:** MongoDB, Redis, Cassandra
-- **Containerization:** Docker
-- **Deployment:** Render / Vercel
-- **Other:** Jackson, SLF4J, Git, GitHub
+| Area | Technologies |
+| --- | --- |
+| Backend | Java 21, Spring Boot 4.1.2, Spring MVC, Maven |
+| Persistence | Spring Data Redis, Spring Data MongoDB, Spring Data Cassandra |
+| API documentation | springdoc-openapi 3.1.1 / Swagger UI |
+| Monitoring | Spring Boot Actuator (`/actuator/health`) |
+| Testing | JUnit / Spring Boot Test, Maven |
+| Containers | Multi-stage Docker build, Eclipse Temurin 21, non-root runtime user |
+| Hosting | RunMyDocker (backend), Vercel (frontend) |
+| Frontend | React 19, TypeScript, Axios |
+
+## REST API
+
+The following endpoints are implemented in `AppController`:
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/user?name={username}` | Create a user |
+| `GET` | `/user?name={username}` | Get user information and link summaries |
+| `POST` | `/tiny` | Generate a short URL for an existing user |
+| `GET` | `/{code}/` | Redirect to the original URL and record a click |
+| `GET` | `/user/clicks?name={username}` | Retrieve the user's click history |
+| `GET` | `/actuator/health` | Check application health |
+
+The older path-based user endpoints are also retained for compatibility. Prefer the query-based endpoints for usernames containing reserved URL characters.
+
+**Example: create a short link**
+
+```http
+POST /tiny
+Content-Type: application/json
+
+{
+  "longUrl": "https://example.com/article",
+  "userName": "demo-user"
+}
+```
+
+A successful request returns a complete short-link URL. The user must already exist.
+
+**Example: health response**
+
+```json
+{"groups":["liveness","readiness"],"status":"UP"}
+```
+
+Health details are intentionally limited in the deployed configuration.
+
+## Run locally
+
+### Requirements
+
+- JDK **21**
+- Maven **3.9+** (or a compatible Maven installation)
+- Working connections to Redis, MongoDB, and Cassandra / Astra DB
+- A secure-connect bundle for Astra DB when using the cloud Cassandra connection
+
+Clone the repository:
+
+```bash
+git clone https://github.com/elad9219/tinyurl.git
+cd tinyurl
+```
+
+Copy the configuration template:
+
+```bash
+cp src/main/resources/application.properties.example \
+   src/main/resources/application.properties
+```
+
+Fill the local file with **your own** database settings. For local development, place your Astra secure-connect ZIP in `src/main/resources/` and set `astra.db.secure-connect-bundle` to its file name. The application also supports a Base64-encoded secure-connect bundle through `astra.db.secure-connect-bundle-base64` (or its corresponding environment variable).
+
+Run tests and start the server:
+
+```bash
+mvn test
+mvn spring-boot:run
+```
+
+The API listens on `http://localhost:8080` by default. For local short links, configure `base.url=http://localhost:8080/`.
+
+## Docker and deployment
+
+The Dockerfile builds the application with **Maven + Java 21**, then copies only the executable JAR into a smaller **Java 21 runtime image**. The runtime process uses a **non-root user**.
+
+Build the Docker image:
+
+```bash
+docker build --platform linux/amd64 -t tinyurl-backend:local .
+```
+
+Run it with external configuration (prepare your own environment file **outside the Git repository**, for example at `$HOME/.config/tinyurl/backend.env`, containing the required runtime values):
+
+```bash
+docker run --rm --platform linux/amd64 \
+  -p 8080:8080 \
+  --env-file "$HOME/.config/tinyurl/backend.env" \
+  tinyurl-backend:local
+```
+
+The container does **not** package local credentials or secure-connect ZIP files. In the deployed version, Spring Boot receives connection settings using `SPRING_APPLICATION_JSON`, including the Base64-encoded Astra secure-connect bundle. Alternative Spring environment variables can also supply the settings.
+
+**Never commit or publish** real `.env` files, `application.properties`, database credentials, or Astra secure-connect bundles. In particular, this repository's existing `.gitignore` does not currently ignore a root `.env` file, so keep the Docker environment file outside the checkout. Use appropriate access restrictions and rotate credentials if they were ever included in a published image.
 
 ## Screenshots
+
+*These images are from an earlier UI iteration. They are retained as project references; the live interface may differ slightly.*
 
 ### Homepage
 
@@ -58,87 +167,25 @@ A full-stack URL shortening application built with Spring Boot and React. The pr
 
 ![Click details](https://github.com/user-attachments/assets/808bbdae-e858-4eeb-b320-75d86866bfd8)
 
-## Usage
-
-1. Create a user.
-2. Submit a long URL to generate a shortened URL.
-3. Open the shortened URL to be redirected to the original destination.
-4. View user-level URL and click statistics.
-5. Inspect click history for individual shortened URLs.
-
-## Local Setup
-
-### Prerequisites
-
-- Java 11
-- Maven
-- Node.js and npm
-- MongoDB
-- Redis
-- Cassandra
-- Docker (optional)
-- Git
-
-### Backend
-
-```bash
-git clone https://github.com/elad9219/tinyurl.git
-cd tinyurl
-```
-
-Create your local configuration from `src/main/resources/application.properties.example`, then replace the placeholders with your own MongoDB, Redis, and Cassandra/Astra DB values.
-
-```bash
-mvn clean install
-mvn spring-boot:run
-```
-
-> Never commit real database passwords, API keys, connection strings, or secure-connect credentials.
-
-### Frontend
-
-```bash
-git clone https://github.com/elad9219/tinyurl-frontend.git
-cd tinyurl-frontend
-npm install
-npm start
-```
-
-### Docker
-
-After configuring the required database connections:
-
-```bash
-docker build -t tinyurl-backend .
-docker run -p 8080:8080 tinyurl-backend
-```
-
-## Project Structure
-
-### Backend
-
-```text
-src/main/java/com/handson/tinyurl/
-├── config/
-├── controller/
-├── model/
-├── repository/
-├── service/
-└── util/
-```
-
-### Frontend
+## Repository structure
 
 ```text
 src/
-├── components/
-├── utils/
-└── App.tsx
+├── main/
+│   ├── java/com/handson/tinyurl/
+│   │   ├── config/
+│   │   ├── controller/
+│   │   ├── model/
+│   │   ├── repository/
+│   │   ├── service/
+│   │   └── util/
+│   └── resources/
+└── test/
+Dockerfile
+pom.xml
 ```
 
-## Contact
+## Author
 
-- **Elad Tennenboim**
-- **GitHub:** [elad9219](https://github.com/elad9219)
-- **LinkedIn:** [linkedin.com/in/elad-tennenboim](https://www.linkedin.com/in/elad-tennenboim/)
-- **Email:** elad9219@gmail.com
+**Elad Tennenboim**  
+[GitHub](https://github.com/elad9219) · [LinkedIn](https://www.linkedin.com/in/elad-tennenboim/) · [Email](mailto:elad9219@gmail.com)
